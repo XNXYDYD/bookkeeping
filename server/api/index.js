@@ -1,13 +1,15 @@
 const router = require('koa-router')();
-let record = require('./add_record')
+let record = require('./add_record');
+
+// 
 // 配置路由
 
 router.get('/',function(ctx,next){
   ctx.body = 'index'
 });
 
-
-router.get('/get',async function(ctx,next){
+// 查询记录
+router.get('/getRecord',async function(ctx,next){
   //从request中获取GET请求
   let request =ctx.request;
   let params = request.query;
@@ -15,6 +17,7 @@ router.get('/get',async function(ctx,next){
   console.log(params, req_querystring);
   // 在数据池中进行会话操作 desc asc
   // let data = await ctx.db.query(`SELECT * FROM account_list WHERE is_delete = '1' order by date desc,save_time desc;`);
+  // SELECT * FROM account_list WHERE is_delete = '1' AND date >= '2019-04-01' 
   // 分页获取
   let condition =  params.page>0 && params.pageSize>0;
   let startNumber = condition ? params.page > 1 ?  (params.page-1) * params.pageSize : 0 : '';
@@ -27,6 +30,7 @@ router.get('/get',async function(ctx,next){
       msg:'获取数据失败'
     };
   }
+  // 存到数据库的金额要为数字类型，这里做数据转换
   let exportData = data.map(i => {
     i.pay = i.pay * 1;
     return i;
@@ -36,18 +40,24 @@ router.get('/get',async function(ctx,next){
 
 router.get('/categories',async function(ctx,next){
   // 在数据池中进行会话操作
-  let data = await ctx.db.query('SELECT * FROM categories order by category_code asc;');
+  let data = await ctx.db.query('SELECT * FROM new_categories order by code asc;');
+  console.log('categories', typeof data, Object.prototype.toString.call(data));
+  if( Object.prototype.toString.call(data) !='[object Array]' ){
+    ctx.body ={
+      code:-1,
+      msg:'获取数据失败'
+    };
+    return;
+  }
   ctx.body = data;
 });
 
 router.get('/getSum',async function(ctx,next){
   // 在数据池中进行会话操作
-  // select sum(quantity) as items_ordered from orderitems where order_num = 20005;
-  let data = await ctx.db.query(`SELECT SUM(pay) AS paySum FROM account_list WHERE is_delete = '1';`);
+  let data = await ctx.db.query(`SELECT SUM(pay) AS paySum FROM account_list WHERE is_delete = '1' AND date >= '2019-04-01';`);
   ctx.body = data[0].paySum;
 });
 
-// router.use('/addRecord',record);
 router.post('/addRecord',async function(ctx,next){
   let body = ctx.request.body;
   console.log('POST', body);
@@ -59,10 +69,10 @@ router.post('/addRecord',async function(ctx,next){
     }
     ctx.body =resp;
     return;
-  }else if(!body.item){
+  }else if(!body.category_name){
     resp = {
       code:300,
-      msg:'类别不能为空'
+      msg:'支出项不能为空'
     }
     ctx.body =resp;
     return;
@@ -73,8 +83,17 @@ router.post('/addRecord',async function(ctx,next){
     }
   }
   console.log('body', body);
-  let data = await ctx.db.query(`INSERT INTO account_list(date,item,pay,save_time,income,note) 
-                                  VALUES('${body.date}','${body.item}',${body.pay},'${body.saveTime}',${body.income || '0.00'}),${body.note || ''});`);
+  let data = await ctx.db.query(`INSERT INTO account_list(date,category_name,pay,save_time,income,note,parent_code,code) 
+                                  VALUES(
+                                    '${body.date}',
+                                    '${body.category_name}',
+                                    ${body.pay},
+                                    '${body.saveTime}',
+                                    ${body.income || '0.00'},
+                                    '${body.note}',
+                                    '${body.parent_code}',
+                                    '${body.code}');
+                                  `);
   console.log('data', data);
   if( data.affectedRows > 0){
     ctx.body =resp;
@@ -86,8 +105,7 @@ router.post('/addRecord',async function(ctx,next){
   }
 });
 
-/* 修改添加记录 */
-
+/* 修改记录 */
 router.post('/upadteRecord', async function(ctx,req){
   let body = ctx.request.body;
   console.log('upadteRecord', body);
@@ -104,10 +122,10 @@ router.post('/upadteRecord', async function(ctx,req){
     }
     ctx.body =resp;
     return;
-  }else if(!body.item){
+  }else if(!body.category_name){
     resp = {
       code:300,
-      msg:'类别不能为空'
+      msg:'支出项不能为空'
     }
     ctx.body =resp;
     return;
@@ -117,9 +135,7 @@ router.post('/upadteRecord', async function(ctx,req){
       msg:'成功'
     }
   }
-  // `VALUES('${body.date}','${body.item}',${body.pay},'${body.saveTime}',${body.income || '0.00'});`
-  let data = await ctx.db.query(`UPDATE account_list SET item='${body.item}',pay='${body.pay}',date='${body.date}',save_time='${body.saveTime}',note='${body.note}' WHERE ID = '${body.id}';`);
-  // let data = await ctx.db.query(`UPDATE account_list SET item='霸王餐',pay='55.00',date='2019-03-15',save_time='1552619934436' WHERE id = '1';`);
+  let data = await ctx.db.query(`UPDATE account_list SET category_name='${body.category_name}',pay='${body.pay}',date='${body.date}',save_time='${body.saveTime}',note='${body.note}',code='${body.code}',parent_code='${body.parent_code}' WHERE ID = '${body.id}';`);
   console.log('data', data);
   if( data.affectedRows > 0){
     ctx.body =resp;
