@@ -41,7 +41,7 @@ router.get('/getRecord',async function(ctx,next){
 router.get('/categories',async function(ctx,next){
   // 在数据池中进行会话操作
   let data = await ctx.db.query('SELECT * FROM new_categories order by code asc;');
-  console.log('categories', typeof data, Object.prototype.toString.call(data));
+  // console.log('categories', typeof data, Object.prototype.toString.call(data));
   if( Object.prototype.toString.call(data) !='[object Array]' ){
     ctx.body ={
       code:-1,
@@ -54,7 +54,9 @@ router.get('/categories',async function(ctx,next){
 
 router.get('/getSum',async function(ctx,next){
   // 在数据池中进行会话操作
-  let data = await ctx.db.query(`SELECT SUM(pay) AS paySum FROM account_list WHERE is_delete = '1' AND date >= '2019-04-01';`);
+  console.log('ctx', ctx.query);
+  let month = ctx.query.month || new Date().getMonth + 1;
+  let data = await ctx.db.query(`SELECT SUM(pay) AS paySum FROM account_list WHERE is_delete = '1' AND date >= '2019-0${month}-01' AND date <= '2019-0${month}-31';`);
   ctx.body = data[0].paySum;
 });
 
