@@ -55,6 +55,7 @@
           value-key="category_name"
           @cancel="onCancel"
           @confirm="onConfirm"
+          @change="onChange"
         />
       </div>
     </van-popup>
@@ -94,8 +95,12 @@ export default {
       showAdd:false,
       showType:false,
       showNumKB:false,
-      columns: ['早餐'],
-      
+      // 类型选择列表
+      columns: [],
+      parentColumn:[],
+      columnData:[],
+      originCategories:[],
+      // 显示事件选择器
       showTimeSelect:false,
       /* 记录数据 */
       category_name:'早餐',
@@ -251,11 +256,45 @@ export default {
       me.$http.get('http://localhost:2019/categories', {text:me.text}).then(data => {
         if(data.data && data.data.length > 0){
           // me.columns = data.data.map(item => item.category_name);
-          me.columns = data.data;
+          let tempColumns = [],
+              parent = [],
+              child = {};
+          // 筛选父级
+          data.data.forEach(item => {
+            if(item.parent_code == item.code){
+              parent.push(item.category_name);
+            }
+          });
+          // 获取第二级子级
+          parent.forEach((item,index) => {
+            let arr = [];
+            data.data.forEach(i => {
+              if(item == i.parent_name){
+                arr.push(i);
+              }
+            });
+            child[item] = arr;
+          });
+          // 添加父级
+          let _p = Object.keys(child);
+          tempColumns.push({
+            values: _p,
+            className: 'column1'
+          });
+          // 对应的子级
+          tempColumns.push({
+            values: child[_p[0]],
+            className: 'column2'
+          });
+
+          me.originCategories = data.data;
+          me.columnData = child;
+          me.columns = tempColumns;
         }else{
           Toast('请求失败');
         }
       }).catch(res => {
+        console.error('error', res)
         Toast(`请求错误，刷新页面重试`);
       });
     },
@@ -267,13 +306,19 @@ export default {
     showCategories(){
       this.showType = true;
     },
-    /* 选中消费你类型 */
+    /* 选择消费类型 */
     onConfirm(value, index) {
       console.log('value', value)
       this.showType = false;
-      this.category_name = value.category_name;
-      this.parent_code = value.parent_code;
-      this.code = value.code;
+      this.category_name = value[1].category_name;
+      this.parent_code = value[1].parent_code;
+      this.code = value[1].code;
+    },
+    /* 列操作 */
+    onChange(picker, values) {
+      console.log('v', values)
+      let me = this;
+      picker.setColumnValues(1, me.columnData[values[0]]);
     },
     // 隐藏消费类型
     onCancel(){

@@ -177,7 +177,8 @@ export default {
     /* 获取总支出 */
     getPaySum(){
       let me = this;
-      me.$http.get('http://localhost:2019/getSum', {text:me.text}).then(data => {
+      let month = '5'
+      me.$http.get('http://localhost:2019/getSum', {month}).then(data => {
         if(data.data){
           me.paySum = data.data;
         }else{
