@@ -1,6 +1,14 @@
 <template>
   <div class="main">
-    <div class="sum">总支出：{{paySum | momneySuffix}}</div>
+    <div class="hearder">
+      <div class="serach_date" @click="showSearchDate">
+        月份：{{SearchDate}}
+        <van-icon name="arrow-down" class="date_arr_dowm"/>
+      </div>
+      <div class="sum">
+        总支出：{{paySum | momneySuffix}}
+      </div>
+    </div>
     <van-button type="primary" class="main-btn" @click="showAddPopup(null)">记一笔</van-button>
     <div id="list_container">      
       <van-row  class="record_list"  v-for="item in recordList" :key="item.id">
@@ -14,14 +22,31 @@
     </div>
     <!-- 记一笔 -->
     <calculate v-model="show" @complete="finish" ref="addition" :data="updateData" :title="calculateTitle"></calculate>
+
+    <!-- 查询总金额开始时间 -->
+    <van-popup v-model="showSumDate" overlay-class="time_mask"  position="bottom" style="width:100%;">
+      <van-datetime-picker
+        v-model="tempSearchDate"
+        type="year-month"
+        :min-date="minDate"
+        :max-date="maxDate"
+        @confirm="getSumSearchDate"
+        :formatter="formatter"
+      />
+    </van-popup>
   </div>
 </template>
 
 <script>
-import {Toast} from 'vant';
+// import {Toast, Search} from 'vant';
 import moment from 'moment';
 import calculate from './calculate';
 let ready = false;
+let currentDateTime = new Date();
+let currentYear = currentDateTime.getFullYear();
+let currentMonth = (currentDateTime.getMonth()+1);
+let stringMonth = (currentMonth > 9  ? currentMonth : '0' + currentMonth);
+let lastDate = new Date(currentYear,currentMonth,0).getDate();
 export default {
   name: 'index',
   props: {
@@ -32,7 +57,13 @@ export default {
   },
   data(){
     return {
+      minDate: new Date('2019/03/01 00:00:00'),
+      maxDate: new Date(`2019/${stringMonth}/${lastDate} 23:59:59`),
+      // 查询总金额
+      tempSearchDate: currentYear + '-' + stringMonth,
+      SearchDate: currentYear + '-' + stringMonth,
       paySum:'0.00',
+      showSumDate:false,
       calculateTitle:'',
       /* 分页查询条件 */
       listQuery:{
@@ -55,6 +86,28 @@ export default {
     me.getPaySum();
   },
   methods:{
+    // 总金额时间
+    getSumSearchDate(value){
+      console.log('value', value)
+      let _year = value.getFullYear();
+      let _month = value.getMonth() + 1;
+      this.SearchDate = _year+ '-' + (_month>9 ? _month : '0'+_month);
+      this.showSumDate = false;
+      this.listQuery.page = 1;
+      this.$nextTick(()=>{
+        this.getPaySum();
+        this.getList();
+      });
+    },
+    // 显示搜索月份选择器
+    showSearchDate(){
+      this.showSumDate = true;
+    },
+    // 格式化获取金额汇总
+    formatter(type,value){
+      return value;
+    },
+    // 设置cookies
     setC(name,value){
       var Days = 30;
       var exp = new Date();
@@ -111,15 +164,15 @@ export default {
       me.$http.post('http://localhost:2019/addRecord',param ).then(data => {
         console.log('addRecord', data);
         if(data.data.code === 0 && data.data.msg == '成功'){
-          Toast(`保存成功`);
+          me.$toast('保存成功');
           me.listQuery.page = 1;
           me.listQuery.isFinish = false;
           me.initData();
         }else{
-          Toast(`保存失败`);
+          me.$toast(`保存失败`);
         }
       }).catch(res => {
-        Toast(`请求错误，请稍后再试`);
+        me.$toast(`请求错误，请稍后再试`);
       });
       // this.showAdd = false;
     },
@@ -129,10 +182,10 @@ export default {
       let data = await me.$http.post('http://localhost:2019/upadteRecord',param);
       console.log('update', data);
       if(data.data.msg == '成功'){
-        Toast(`修改成功`);
+        me.$toast(`修改成功`);
         me.initData();
       }else{
-        Toast(`修改记录失败，请稍后再试`);
+        me.$toast(`修改记录失败，请稍后再试`);
       }
     },
     // 显示添加和修改记录界面
@@ -150,25 +203,28 @@ export default {
     getList(isMore = false){
       let me = this;
       let q = me.listQuery;
-      let params = {pageSize:q.pageSize,page:q.page};
+      let date = this.SearchDate || (currentYear + '-' + stringMonth);
+      let params = {pageSize:q.pageSize,page:q.page,date};
       me.$http.get('http://localhost:2019/getRecord', params).then(data => {
-        if(data.data && data.data.length > 0){
+        if(data.data && Object.prototype.toString.call(data.data)=='[object Array]'){
           me.recordList = isMore ? me.recordList.concat(...data.data) : data.data;
           if(data.data.length < 10){
             me.listQuery.isFinish = true;
+          }else{
+            me.listQuery.isFinish = false;
           }
         }else{
-          Toast('请求失败');
+          me.$toast('获取记录失败');
         }
       }).catch(res => {
-        Toast(`请求错误，刷新页面重试`);
+        me.$toast(`请求错误，刷新页面重试`);
         console.log('getList error', res);
       });
     },
     /* 下一页 */
     nextPage(){
       if( this.listQuery.isFinish ){
-        Toast('没有更多啦');
+        me.$toast('没有更多啦');
         return;
       }
       this.listQuery.page = this.listQuery.page*1 + 1;
@@ -177,15 +233,15 @@ export default {
     /* 获取总支出 */
     getPaySum(){
       let me = this;
-      let month = '5'
-      me.$http.get('http://localhost:2019/getSum', {month}).then(data => {
+      let date = this.SearchDate || (currentYear + '-' + (currentMonth>9?currentMonth:'0'+currentMonth));
+      me.$http.get('http://localhost:2019/getSum', {date}).then(data => {
         if(data.data){
           me.paySum = data.data;
         }else{
-          Toast('请求失败');
+          me.$toast('请求失败');
         }
       }).catch(res => {
-        Toast(`请求错误，刷新页面重试.`+res);
+        me.$toast(`请求错误，刷新页面重试.`+res);
       });
     }
   },
@@ -218,12 +274,26 @@ export default {
 .main{
   padding: .5rem 0;
 }
+.hearder{
+   font-size:1.2rem;
+   height: 1rem;
+   line-height: 1rem;
+   overflow: hidden;
+   padding: .75rem 1.5rem;
+}
 .sum{
-  margin: .5rem 0 1rem 0;
-  font-size:1.2rem;
+  float: right;
+}
+.serach_date{
+  float: left;
+  overflow: hidden;
+}
+.date_arr_dowm{
+  font-size: 1rem;
 }
 .main-btn{
   width:90%;
+  margin-top: .75rem;
 }
 .record_list{
   padding: .5rem 1rem;  

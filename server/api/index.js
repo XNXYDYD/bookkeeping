@@ -14,7 +14,7 @@ router.get('/getRecord',async function(ctx,next){
   let request =ctx.request;
   let params = request.query;
   let req_querystring = request.querystring;
-  console.log(params, req_querystring);
+  console.log('getRecord', params);
   // 在数据池中进行会话操作 desc asc
   // let data = await ctx.db.query(`SELECT * FROM account_list WHERE is_delete = '1' order by date desc,save_time desc;`);
   // SELECT * FROM account_list WHERE is_delete = '1' AND date >= '2019-04-01' 
@@ -23,7 +23,9 @@ router.get('/getRecord',async function(ctx,next){
   let startNumber = condition ? params.page > 1 ?  (params.page-1) * params.pageSize : 0 : '';
   let pageSize = condition ? params.pageSize: '';
   let limitStr =   condition ? `LIMIT ${startNumber},${pageSize}` : '';
-  let data = await ctx.db.query(`SELECT * FROM account_list WHERE is_delete = '1' ORDER BY date DESC,save_time DESC  ${limitStr};`);
+  console.log(`SELECT * FROM account_list WHERE is_delete = '1'AND date >='${params.date}-01' AND date <='${params.date}-31' ORDER BY date DESC,save_time DESC  ${limitStr};`)
+  // let data = await ctx.db.query(`SELECT * FROM account_list WHERE is_delete = '1' ORDER BY date DESC,save_time DESC  ${limitStr};`);
+  let data = await ctx.db.query(`SELECT * FROM account_list WHERE is_delete = '1'AND date >='${params.date}-01' AND date <='${params.date}-31' ORDER BY date DESC,save_time DESC  ${limitStr};`);
   if( data.length < 1 ){
     ctx.body ={
       code:-1,
@@ -55,8 +57,8 @@ router.get('/categories',async function(ctx,next){
 router.get('/getSum',async function(ctx,next){
   // 在数据池中进行会话操作
   console.log('ctx', ctx.query);
-  let month = ctx.query.month || new Date().getMonth + 1;
-  let data = await ctx.db.query(`SELECT SUM(pay) AS paySum FROM account_list WHERE is_delete = '1' AND date >= '2019-0${month}-01' AND date <= '2019-0${month}-31';`);
+  let searchDate = ctx.query.date;
+  let data = await ctx.db.query(`SELECT SUM(pay) AS paySum FROM account_list WHERE is_delete = '1' AND date >= '${searchDate}-01' AND date <= '${searchDate}-31';`);
   ctx.body = data[0].paySum;
 });
 
@@ -94,8 +96,8 @@ router.post('/addRecord',async function(ctx,next){
                                     ${body.income || '0.00'},
                                     '${body.note}',
                                     '${body.parent_code}',
-                                    '${body.code}');
-                                  `);
+                                    '${body.code}');`
+                                    );
   console.log('data', data);
   if( data.affectedRows > 0){
     ctx.body =resp;
@@ -147,6 +149,15 @@ router.post('/upadteRecord', async function(ctx,req){
       msg:'保存失败'
     };
   }
+});
+router.get('/chartData',async function(ctx,next){
+  console.log('ctx', ctx.request.body)
+  ctx.body = {
+    obj:[
+      {module:'A20N02D', updateTime:'2019-05-29 08:21:47' ,Date:'20190529' ,tbl:'tbl_A20N02D_20190529' ,cacheId: '1145'},
+      {module:'S8V04B', updateTime:'2019-05-29 09:22:47' ,Date:'20190529' ,tbl:'tbl_S8V04B_20190529' ,cacheId: '3677'},
+    ]
+  };
 });
 
 module.exports = router;
